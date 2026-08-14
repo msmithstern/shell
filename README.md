@@ -1,28 +1,92 @@
 ```
- ____  _          _ _   ____
-/ ___|| |__   ___| | | |___ \
-\___ \| '_ \ / _ \ | |   __) |
- ___) | | | |  __/ | |  / __/
-|____/|_| |_|\___|_|_| |_____|
+ ____  _          _ _  
+/ ___|| |__   ___| | |
+\___ \| '_ \ / _ \ | | 
+ ___) | | | |  __/ | |  
+|____/|_| |_|\___|_|_| 
 ```
 
-Hi there welcome to my shell 2 description! This project almost broke me but thankfully it's over 
-and I passed the tests! For your convenience, my dear grader, I have also included a description 
-of my shell 1 here since it contains a lot of relevant descriptions: 
 
-This is my Shell 1. It uses a while loop and reads in lines. It then parses using my modified lab2. 
-Then it handles command execution. This function returns values based on if each command was 
-executed. Everything returns 1 except for exit which returns 2 so exit can be handled properly. I 
-return 1 to avoid using a continue keyword. I then fork and inside the child process I handle 
-redirections which loops through the tokens and accordingly handles each redirection. We then excecv 
-passing in the filepath and argv and wait at the end passing in NULL as the argument as suggested in 
-the handout. 
-
-But for shell 2 I built on this functionality. I added in handling for signals. It also now creates 
-and maintains a job list to keep track of jobs being run. I also added functionality to the 
-execute_builtins to handle fg and bg commands. I also implemented reaping to free any resources 
-that persist on the system. I also added a lot of logic to handle setting terminal control and 
-foreground vs background jobs. I made a few edits to parsing to handle running jobs in the 
-background too. Please refer to function comments and in line comments too!
-
-Compile using make clean all or make 33sh and make 33noprompt
+A Unix shell written in C. Reads and parses command lines, executes programs in child
+processes, handles input/output redirection, responds to signals, and manages foreground
+and background jobs with full terminal control.
+ 
+Built in two milestones: a core execution shell, then job control layered on top.
+ 
+## Features
+ 
+**Execution**
+- Built-in commands handled in-process; external programs executed via `fork` and `execv`
+- Input and output redirection (`<`, `>`, `>>`), applied in the child before `exec`
+- Clean exit handling distinguished from normal command completion
+**Job control**
+- Job list tracking every running and stopped job with its process group and state
+- `fg` and `bg` built-ins to resume jobs in the foreground or background
+- Terminal control transferred between the shell and foreground process groups
+- Background jobs launched with `&`
+- Terminated children reaped so no system resources are left held
+**Signals**
+- `SIGINT`, `SIGTSTP`, and `SIGQUIT` forwarded to the foreground job rather than killing the shell
+- `SIGCHLD` handled to keep the job list in sync with actual process state
+## Build
+ 
+```
+make clean all
+```
+ 
+This produces two binaries:
+ 
+| Binary | Description |
+|---|---|
+| `33sh` | Interactive shell with a prompt |
+| `33noprompt` | Same shell without the prompt, for scripted input and testing |
+ 
+Either can be built on its own with `make 33sh` or `make 33noprompt`.
+ 
+## Usage
+ 
+```
+./33sh
+```
+ 
+Then use it as you would any shell:
+ 
+```
+ls -la > output.txt        # redirect stdout
+wc -l < source.txt         # redirect stdin
+sleep 30 &                 # run in background
+jobs                       # list jobs
+fg %1                      # bring job 1 to the foreground
+```
+ 
+## Implementation notes
+ 
+**Main loop.** The shell reads a line, tokenizes it, and dispatches to either a built-in
+or an external command. Command execution returns a status code the loop uses to decide
+whether to continue or terminate — a distinct code for `exit` keeps that path explicit
+rather than relying on control-flow keywords scattered through the loop.
+ 
+**Redirection.** Handled inside the child after `fork` and before `execv`, by scanning the
+token list for redirection operators and rewiring the relevant file descriptors. Doing this
+in the child leaves the parent shell's descriptors untouched.
+ 
+**Job control.** The job list is the source of truth for what is running. Each job carries
+its process group ID and state so the shell can signal an entire group, hand the terminal
+over to a foreground job, and take it back when that job stops or exits. Reaping runs
+against this list so terminated children are cleaned up and their entries removed.
+ 
+**Parsing.** The tokenizer is adapted from an earlier exercise, extended to recognize the
+trailing `&` that marks a background job.
+ 
+Function-level and inline comments in the source cover the details.
+ 
+## Files
+ 
+| File | Contents |
+|---|---|
+| `sh.c` | Main loop, parsing, redirection, command dispatch, signal handling |
+| `sh.h` | Shell declarations |
+| `jobs.c` | Job list implementation |
+| `jobs.h` | Job list interface |
+| `Makefile` | Build targets for both binaries |
+ 
